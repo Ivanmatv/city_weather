@@ -29,7 +29,7 @@
 
   <div id="weatherResult"></div>
   <div id="errorMessage" class="error"></div>
-
+{% if last_city %}
 <script>
   const cityInput = document.getElementById('cityInput');
   const suggestions = document.getElementById('suggestions');
@@ -39,7 +39,7 @@
   const form = document.getElementById('weatherForm');
 
   // Показываем предложение с последним городом, если сервер его передал через data-атрибут
-  const lastCity = "{{ last_city | default('') }}";
+  const lastCity = "{{ last_city }}";
   if (lastCity) {
     lastCityContainer.innerHTML = `
       <div class="last-city">
@@ -49,7 +49,9 @@
     document.getElementById('showLastCity').addEventListener('click', e => {
       e.preventDefault();
       cityInput.value = lastCity;
-      form.submit();
+      setTimeout(() => {
+        form.dispatchEvent(new Event('submit', {cancelable: true}));
+      }, 10);
     });
   }
 
@@ -126,6 +128,6 @@
     }
   });
 </script>
-
+{% endif %}
 </body>
 </html>

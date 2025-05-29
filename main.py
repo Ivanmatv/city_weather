@@ -73,10 +73,9 @@ async def get_weather(
     if not location:
         if "application/json" in accept:
             return JSONResponse({"error": "Город не найден"}, status_code=400)
-        return templates.TemplateResponse("index.html", {"request": request, "weather": None, "error": "Город не найден", "last_city": None})
+        return RedirectResponse(url="/", status_code=303)
 
     lat, lon = location.latitude, location.longitude
-
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
     async with httpx.AsyncClient() as client:
         weather_resp = await client.get(url)
@@ -85,25 +84,23 @@ async def get_weather(
     if "current_weather" not in data:
         if "application/json" in accept:
             return JSONResponse({"error": "Данные о погоде недоступны"}, status_code=400)
-        return templates.TemplateResponse("index.html", {"request": request, "weather": None, "error": "Данные о погоде недоступны", "last_city": None})
-
-    weather = data["current_weather"]
-    weather_info = {
-        "temperature": weather["temperature"],
-        "windspeed": weather["windspeed"],
-        "winddirection": weather["winddirection"],
-        "time": weather["time"],
-        "city": city.title()
-    }
+        return RedirectResponse(url="/", status_code=303)
 
     save_search(user_id, city.title())
 
     if "application/json" in accept:
-        return JSONResponse({"weather": weather_info})
+        weather = data["current_weather"]
+        return JSONResponse({
+            "weather": {
+                "temperature": weather["temperature"],
+                "windspeed": weather["windspeed"],
+                "winddirection": weather["winddirection"],
+                "time": weather["time"],
+                "city": city.title()
+            }
+        })
 
-    response = templates.TemplateResponse("index.html", {"request": request, "weather": weather_info, "error": None, "last_city": city.title()})
-    response.set_cookie(key="user_id", value=user_id, max_age=3600*24*365*2)
-    return response
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.get("/autocomplete")
