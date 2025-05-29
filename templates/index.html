@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Прогноз погоды</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; }
+  input[type="text"] { width: 70%; padding: 8px; }
+  input[type="submit"] { padding: 8px 15px; }
+  #suggestions { border: 1px solid #ccc; max-width: 70%; position: absolute; background: white; z-index: 10; }
+  #suggestions div { padding: 5px; cursor: pointer; }
+  #suggestions div:hover { background-color: #f0f8ff; }
+  .weather { background-color: #f0f8ff; padding: 15px; border-radius: 8px; margin-top: 20px; }
+  .last-city { margin-bottom: 20px; background: #eef6ff; padding: 10px; border-radius: 5px; }
+  .error { color: red; }
+  .relative { position: relative; }
+</style>
+</head>
+<body>
+  <h1>Прогноз погоды</h1>
+
+  <div id="lastCityContainer"></div>
+
+  <form id="weatherForm" method="post" action="/weather" class="relative">
+    <input type="text" id="cityInput" name="city" placeholder="Введите название города" autocomplete="off" required />
+    <input type="submit" value="Показать погоду" />
+    <div id="suggestions"></div>
+  </form>
+
+  <div id="weatherResult"></div>
+  <div id="errorMessage" class="error"></div>
+
+<script>
+  const cityInput = document.getElementById('cityInput');
+  const suggestions = document.getElementById('suggestions');
+  const weatherResult = document.getElementById('weatherResult');
+  const errorMessage = document.getElementById('errorMessage');
+  const lastCityContainer = document.getElementById('lastCityContainer');
+  const form = document.getElementById('weatherForm');
+
+  // Показываем предложение с последним городом, если сервер его передал через data-атрибут
+  const lastCity = "{{ last_city | default('') }}";
+  if (lastCity) {
+    lastCityContainer.innerHTML = `
+      <div class="last-city">
+        Хотите посмотреть прогноз погоды в <b>${lastCity}</b>? 
+        <button id="showLastCity">Показать</button>
+      </div>`;
+    document.getElementById('showLastCity').addEventListener('click', e => {
+      e.preventDefault();
+      cityInput.value = lastCity;
+      form.submit();
+    });
+  }
+
+  // Автодополнение при вводе
+  cityInput.addEventListener('input', async () => {
+    const query = cityInput.value.trim();
+    suggestions.innerHTML = '';
+    if (query.length < 2) return;
+
+    try {
+      const response = await fetch(`/autocomplete?query=${encodeURIComponent(query)}`);
+      if (!response.ok) throw new Error('Ошибка сети');
+      const cities = await response.json();
+
+      cities.forEach(city => {
+        const div = document.createElement('div');
+        div.textContent = city;
+        div.onclick = () => {
+          cityInput.value = city;
+          suggestions.innerHTML = '';
+        };
+        suggestions.appendChild(div);
+      });
+    } catch {
+      // Игнорируем ошибки автодополнения
+    }
+  });
+
+  // Прячем подсказки при клике вне поля
+  document.addEventListener('click', (e) => {
+    if (!form.contains(e.target)) {
+      suggestions.innerHTML = '';
+    }
+  });
+
+  // Перехват отправки формы для показа результата без перезагрузки (опционально)
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    errorMessage.textContent = '';
+    weatherResult.textContent = 'Загрузка...';
+    suggestions.innerHTML = '';
+
+    const formData = new FormData(form);
+    try {
+      const response = await fetch('/weather', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Ошибка запроса');
+
+      const data = await response.json();
+
+      if (data.error) {
+        weatherResult.textContent = '';
+        errorMessage.textContent = data.error;
+        return;
+      }
+
+      const w = data.weather;
+      weatherResult.innerHTML = `
+        <div class="weather">
+          <h2>Погода в ${w.city}</h2>
+          <p><strong>Температура:</strong> ${w.temperature} °C</p>
+          <p><strong>Ветер:</strong> ${w.windspeed} км/ч, направление ${w.winddirection}°</p>
+          <p><strong>Время обновления:</strong> ${w.time}</p>
+        </div>`;
+    } catch (err) {
+      weatherResult.textContent = '';
+      errorMessage.textContent = 'Не удалось получить данные о погоде.';
+    }
+  });
+</script>
+
+</body>
+</html>
