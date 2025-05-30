@@ -53,15 +53,13 @@ async def home(request: Request, user_id: str | None = Cookie(default=None)):
         user_id = str(uuid4())
 
     last_city = get_user_last_city(user_id)
-    response = templates.TemplateResponse("index.html", {"request": request, "last_city": last_city, "weather": None, "error": None})
+    response = templates.TemplateResponse(request, "index.html", {"request": request, "last_city": last_city, "weather": None, "error": None})
     response.set_cookie(key="user_id", value=user_id, max_age=3600*24*365*2)
     return response
 
 
 @app.post("/weather")
 async def get_weather(
-    request: Request,
-    response: Response,
     city: str = Form(...),
     user_id: str | None = Cookie(default=None),
     accept: str = Header(default="text/html")
